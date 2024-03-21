@@ -1,0 +1,1792 @@
+{
+ "cells": [
+  {
+   "attachments": {},
+   "cell_type": "markdown",
+   "id": "ce499c93-044f-4421-b93f-aaf06482463b",
+   "metadata": {},
+   "source": [
+    "# Classwork 5 - Text Summarization\n",
+    "### SHU ID 0935993"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "43ba93a4-da45-4881-91f9-3f4b75a86e7b",
+   "metadata": {},
+   "source": [
+    "## import libraries"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 2,
+   "id": "3258092b-9025-4c63-9a2c-7741ef391f85",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "from nltk.corpus import stopwords #you can remove stop words for speed\n",
+    "from nltk.cluster.util import cosine_distance\n",
+    "import numpy as np\n",
+    "import networkx as nx\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "db97228b-0540-482d-857e-20674616b235",
+   "metadata": {},
+   "source": [
+    "## Step 1: Create the “vocabulary”"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "bb77da5b-833f-4067-947e-1319b6584788",
+   "metadata": {},
+   "source": [
+    "#### Open file and split into sentences"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 8,
+   "id": "1439176a-9743-4e9f-9b7d-3429c77fc4ce",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "It was the best of times\n",
+      "It was the worst of times\n",
+      "It was the age of wisdom\n",
+      "It was the age of foolishness\n",
+      "What is the importance of age\n",
+      "This is the best example.\n",
+      "Sentences are  [['It', 'was', 'the', 'best', 'of', 'times'], ['It', 'was', 'the', 'worst', 'of', 'times'], ['It', 'was', 'the', 'age', 'of', 'wisdom'], ['It', 'was', 'the', 'age', 'of', 'foolishness'], ['What', 'is', 'the', 'importance', 'of', 'age'], ['This', 'is', 'the', 'best', 'example.']]\n"
+     ]
+    }
+   ],
+   "source": [
+    "file = open(\"C:/Users/shakkerar/Downloads/Text1.txt\")\n",
+    "#This file contains one paragraph of multiple sentences\n",
+    "filedata = file.readlines()\n",
+    "article = filedata[0].split(\". \") #Just do the first paragraph\n",
+    "\n",
+    "sentences = []\n",
+    "for sentence in article:\n",
+    "    print(sentence)\n",
+    "    sentences.append(sentence.replace(\"[^a-zA-Z]\", \" \").split(\" \"))\n",
+    "print(\"Sentences are \", sentences)\n",
+    "\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "eb2103ed-e754-4434-98de-240aa810b2fa",
+   "metadata": {},
+   "source": [
+    "#### Function to calculate similarity\u000b",
+    "(count the number of common words)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "28e0d331-5a8d-4c34-b0cf-6533891cfbb3",
+   "metadata": {},
+   "source": [
+    "## Step 2: Term Frequency matrix"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 11,
+   "id": "2b153ecb-7c58-467f-9b45-3da3a240f619",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Similarity between sentence1 and sentence2: 0.8333333333333334\n"
+     ]
+    }
+   ],
+   "source": [
+    "import numpy as np\n",
+    "from scipy.spatial.distance import cosine\n",
+    "\n",
+    "def sentence_similarity(sent1, sent2):\n",
+    "    sent1 = [w.lower() for w in sent1]\n",
+    "    sent2 = [w.lower() for w in sent2]\n",
+    "    \n",
+    "    all_words = list(set(sent1 + sent2))\n",
+    "    vector1 = [0] * len(all_words)\n",
+    "    vector2 = [0] * len(all_words)\n",
+    "    \n",
+    "    # build the vector for the first sentence\n",
+    "    for w in sent1:\n",
+    "        vector1[all_words.index(w)] += 1\n",
+    "    \n",
+    "    # build the vector for the second sentence\n",
+    "    for w in sent2:\n",
+    "        vector2[all_words.index(w)] += 1\n",
+    "    \n",
+    "    # calculate cosine similarity\n",
+    "    similarity = 1 - cosine(vector1, vector2)\n",
+    "    \n",
+    "    return similarity if np.isfinite(similarity) else 0.0\n",
+    "\n",
+    "# Read sentences from a file\n",
+    "file_path = \"C:/Users/shakkerar/Downloads/Text1.txt\"\n",
+    "with open(file_path, \"r\") as file:\n",
+    "    filedata = file.readline()\n",
+    "    sentences = [sentence.strip() for sentence in filedata.split(\".\")]\n",
+    "\n",
+    "# Example usage\n",
+    "sentence1 = sentences[0].split()\n",
+    "sentence2 = sentences[1].split()\n",
+    "similarity_value = sentence_similarity(sentence1, sentence2)\n",
+    "\n",
+    "print(f\"Similarity between sentence1 and sentence2: {similarity_value}\")\n"
+   ]
+  },
+  {
+   "attachments": {},
+   "cell_type": "markdown",
+   "id": "5fbaddf8-2ae7-4064-ada5-0969e3db3806",
+   "metadata": {},
+   "source": [
+    "## Create the similarity matrix "
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 12,
+   "id": "80ad08f8-a52a-4539-b8b1-f6f1775c9b58",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Smilarity matrix \n",
+      " [[0.         0.96456327 0.91025899 0.89211501 0.88131284 0.92630217\n",
+      "  1.        ]\n",
+      " [0.96456327 0.         0.9349924  0.89883685 0.88897464 0.84558193\n",
+      "  1.        ]\n",
+      " [0.91025899 0.9349924  0.         0.92241622 0.92209533 0.8042519\n",
+      "  1.        ]\n",
+      " [0.89211501 0.89883685 0.92241622 0.         0.88643851 0.83695248\n",
+      "  1.        ]\n",
+      " [0.88131284 0.88897464 0.92209533 0.88643851 0.         0.83391817\n",
+      "  1.        ]\n",
+      " [0.92630217 0.84558193 0.8042519  0.83695248 0.83391817 0.\n",
+      "  1.        ]\n",
+      " [1.         1.         1.         1.         1.         1.\n",
+      "  0.        ]]\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "C:\\Users\\shakkerar\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\site-packages\\scipy\\spatial\\distance.py:647: RuntimeWarning: invalid value encountered in divide\n",
+      "  dist = 1.0 - uv / math.sqrt(uu * vv)\n"
+     ]
+    }
+   ],
+   "source": [
+    "similarity_matrix = np.zeros((len(sentences), len(sentences)))\n",
+    " \n",
+    "for idx1 in range(len(sentences)):\n",
+    "        for idx2 in range(len(sentences)):\n",
+    "             if idx1 == idx2: #ignore if both are same sentences\n",
+    "                continue \n",
+    "             similarity_matrix[idx1][idx2] = sentence_similarity(sentences[idx1], sentences[idx2])\n",
+    "\n",
+    "print(\"Smilarity matrix \\n\", similarity_matrix)\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 13,
+   "id": "6392d154-ce2b-4d30-a77e-c85a12e7c764",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Similarity matrix:\n",
+      " [[0.         0.83333333 0.66666667 0.66666667 0.33333333 0.36514837\n",
+      "  1.        ]\n",
+      " [0.83333333 0.         0.66666667 0.66666667 0.33333333 0.18257419\n",
+      "  1.        ]\n",
+      " [0.66666667 0.66666667 0.         0.83333333 0.5        0.18257419\n",
+      "  1.        ]\n",
+      " [0.66666667 0.66666667 0.83333333 0.         0.5        0.18257419\n",
+      "  1.        ]\n",
+      " [0.33333333 0.33333333 0.5        0.5        0.         0.36514837\n",
+      "  1.        ]\n",
+      " [0.36514837 0.18257419 0.18257419 0.18257419 0.36514837 0.\n",
+      "  1.        ]\n",
+      " [1.         1.         1.         1.         1.         1.\n",
+      "  0.        ]]\n"
+     ]
+    }
+   ],
+   "source": [
+    "import numpy as np\n",
+    "from scipy.spatial.distance import cosine\n",
+    "\n",
+    "def sentence_similarity(sent1, sent2):\n",
+    "    sent1 = [w.lower() for w in sent1]\n",
+    "    sent2 = [w.lower() for w in sent2]\n",
+    "    \n",
+    "    all_words = list(set(sent1 + sent2))\n",
+    "    vector1 = [0] * len(all_words)\n",
+    "    vector2 = [0] * len(all_words)\n",
+    "    \n",
+    "    # build the vector for the first sentence\n",
+    "    for w in sent1:\n",
+    "        vector1[all_words.index(w)] += 1\n",
+    "    \n",
+    "    # build the vector for the second sentence\n",
+    "    for w in sent2:\n",
+    "        vector2[all_words.index(w)] += 1\n",
+    "    \n",
+    "    # calculate cosine similarity\n",
+    "    similarity = 1 - cosine(vector1, vector2)\n",
+    "    \n",
+    "    return similarity if np.isfinite(similarity) else 0.0\n",
+    "\n",
+    "# Read sentences from a file\n",
+    "file_path = \"C:/Users/shakkerar/Downloads/Text1.txt\"\n",
+    "with open(file_path, \"r\") as file:\n",
+    "    filedata = file.readline()\n",
+    "    sentences = [sentence.strip().split() for sentence in filedata.split(\".\")]\n",
+    "\n",
+    "# Create a similarity matrix\n",
+    "similarity_matrix = np.zeros((len(sentences), len(sentences)))\n",
+    "\n",
+    "for idx1 in range(len(sentences)):\n",
+    "    for idx2 in range(len(sentences)):\n",
+    "        if idx1 == idx2:  # ignore if both are the same sentences\n",
+    "            continue \n",
+    "        similarity_matrix[idx1][idx2] = sentence_similarity(sentences[idx1], sentences[idx2])\n",
+    "\n",
+    "# Print the similarity matrix\n",
+    "print(\"Similarity matrix:\\n\", similarity_matrix)\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "0113ce2a-d809-49c7-9173-0c00440c999d",
+   "metadata": {},
+   "source": [
+    "## Step3 : Rank sentences in similarity martix"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 14,
+   "id": "8f6b1270-7e96-4d56-b182-43e21072cd17",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "scores {0: 0.14498301193840757, 1: 0.1385458292039456, 2: 0.14414838821831963, 3: 0.14414838821831963, 4: 0.11798514458759378, 5: 0.09333252610390917, 6: 0.2168567117295045}\n"
+     ]
+    }
+   ],
+   "source": [
+    "# Step 3 - Rank sentences in similarity martix\n",
+    "sentence_similarity_graph = nx.from_numpy_array(similarity_matrix)\n",
+    "scores = nx.pagerank(sentence_similarity_graph)\n",
+    "print(\"scores\", scores)\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "410dc981-7aa8-4bea-9687-e8d6a9c8e3a5",
+   "metadata": {},
+   "source": [
+    "## Step4:  Sort sentences by pagerank"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 20,
+   "id": "05221539-eca4-4799-99ee-4d7140931675",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Indexes of top ranked_sentence order are \n",
+      "\n",
+      " [(0.2168567117295045, []), (0.14498301193840757, ['It', 'was', 'the', 'best', 'of', 'times']), (0.14414838821831963, ['It', 'was', 'the', 'age', 'of', 'wisdom']), (0.14414838821831963, ['It', 'was', 'the', 'age', 'of', 'foolishness']), (0.1385458292039456, ['It', 'was', 'the', 'worst', 'of', 'times']), (0.11798514458759378, ['What', 'is', 'the', 'importance', 'of', 'age']), (0.09333252610390917, ['This', 'is', 'the', 'best', 'example'])]\n"
+     ]
+    }
+   ],
+   "source": [
+    "# Step 4 - Sort the rank and pick top sentences\n",
+    "ranked_sentence = sorted(((scores[i],s) for i,s in enumerate(sentences)), reverse=True)    \n",
+    "print(\"Indexes of top ranked_sentence order are \\n\\n\", ranked_sentence)\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "ae68a438-ce7d-4c3b-b3bf-ee5e53d18aa1",
+   "metadata": {},
+   "source": [
+    "## Step 5 - How many sentences to pick\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 28,
+   "id": "a0245605-43ec-4d65-8d46-56cf84c06ce0",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdin",
+     "output_type": "stream",
+     "text": [
+      "How many sentences do you want in the summary?  2\n"
+     ]
+    }
+   ],
+   "source": [
+    "n = int(input(\"How many sentences do you want in the summary? \"))\n",
+    "#n=2\n",
+    "summarize_text = []\n",
+    "for i in range(n):\n",
+    "      summarize_text.append(\" \".join(ranked_sentence[i][1]))\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "711165c9-2f92-417a-98b1-5a4616223aa3",
+   "metadata": {},
+   "source": [
+    "##  Step 6 : Finish off by printing summary"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 29,
+   "id": "de2015ea-15f3-42eb-9d98-a3f2d02a38c8",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Summarize Text: \n",
+      " . It was the best of times\n"
+     ]
+    }
+   ],
+   "source": [
+    "print(\"Summarize Text: \\n\", \". \".join(summarize_text))\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "5172412f-95a3-4453-8203-eb638ec883c1",
+   "metadata": {},
+   "source": [
+    "# text2"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "7a986fc3-cd20-48e9-8fef-4d027d7415ce",
+   "metadata": {},
+   "source": [
+    "## Step 1: Create the “vocabulary”"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "aee61ac5-9a08-4e3c-ab7b-0da82f146fea",
+   "metadata": {},
+   "source": [
+    "#### Open file and split into sentences"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 8,
+   "id": "53f1f41a-6b4e-4746-8be3-310feaf8dbb9",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "I AM SAM\n",
+      "I AM SAM\n",
+      "SAM I AM\n",
+      "THAT SAM-I-AM! THAT SAM-I-AM!\n",
+      "I DO NOT LIKE THAT SAM-I-AM!\n",
+      "DO WOULD YOU LIKE GREEN EGGS AND HAM?\n",
+      "I DO NOT LIKE THEM, SAM-I-AM\n",
+      "I DO NOT LIKE GREEN EGGS AND HAM\n",
+      "WOULD YOU LIKE THEM HERE OR THERE?\n",
+      "I WOULD NOT LIKE THEM HERE OR THERE\n",
+      "I WOULD NOT LIKE THEM ANYWHERE\n",
+      "I DO NOT LIKE GREEN EGGS AND HAM\n",
+      "I DO NOT LIKE THEM, SAM-I-AM\n",
+      "WOULD YOU LIKE THEM IN A HOUSE?\n",
+      "WOULD YOU LIKE THEN WITH A MOUSE?\n",
+      "I DO NOT LIKE THEM IN A HOUSE\n",
+      "I DO NOT LIKE THEM WITH A MOUSE\n",
+      "I DO NOT LIKE THEM HERE OR THERE\n",
+      "I DO NOT LIKE THEM ANYWHERE\n",
+      "I DO NOT LIKE GREEN EGGS AND HAM\n",
+      "I DO NOT LIKE THEM, SAM-I-AM.\n",
+      "\n",
+      "Sentences are  [['I', 'AM', 'SAM'], ['I', 'AM', 'SAM'], ['SAM', 'I', 'AM'], ['THAT', 'SAM-I-AM!', 'THAT', 'SAM-I-AM!'], ['I', 'DO', 'NOT', 'LIKE', 'THAT', 'SAM-I-AM!'], ['DO', 'WOULD', 'YOU', 'LIKE', 'GREEN', 'EGGS', 'AND', 'HAM?'], ['I', 'DO', 'NOT', 'LIKE', 'THEM,', 'SAM-I-AM'], ['I', 'DO', 'NOT', 'LIKE', 'GREEN', 'EGGS', 'AND', 'HAM'], ['WOULD', 'YOU', 'LIKE', 'THEM', 'HERE', 'OR', 'THERE?'], ['I', 'WOULD', 'NOT', 'LIKE', 'THEM', 'HERE', 'OR', 'THERE'], ['I', 'WOULD', 'NOT', 'LIKE', 'THEM', 'ANYWHERE'], ['I', 'DO', 'NOT', 'LIKE', 'GREEN', 'EGGS', 'AND', 'HAM'], ['I', 'DO', 'NOT', 'LIKE', 'THEM,', 'SAM-I-AM'], ['WOULD', 'YOU', 'LIKE', 'THEM', 'IN', 'A', 'HOUSE?'], ['WOULD', 'YOU', 'LIKE', 'THEN', 'WITH', 'A', 'MOUSE?'], ['I', 'DO', 'NOT', 'LIKE', 'THEM', 'IN', 'A', 'HOUSE'], ['I', 'DO', 'NOT', 'LIKE', 'THEM', 'WITH', 'A', 'MOUSE'], ['I', 'DO', 'NOT', 'LIKE', 'THEM', 'HERE', 'OR', 'THERE'], ['I', 'DO', 'NOT', 'LIKE', 'THEM', 'ANYWHERE'], ['I', 'DO', 'NOT', 'LIKE', 'GREEN', 'EGGS', 'AND', 'HAM'], ['I', 'DO', 'NOT', 'LIKE', 'THEM,', 'SAM-I-AM.\\n']]\n"
+     ]
+    }
+   ],
+   "source": [
+    "file = open(\"C:/Users/shakkerar/Desktop/Semester2_content/TBA/text_summary/Text2.txt\")\n",
+    "#This file contains one paragraph of multiple sentences\n",
+    "filedata = file.readlines()\n",
+    "article = filedata[0].split(\". \") #Just do the first paragraph\n",
+    "\n",
+    "sentences = []\n",
+    "for sentence in article:\n",
+    "    print(sentence)\n",
+    "    sentences.append(sentence.replace(\"[^a-zA-Z]\", \" \").split(\" \"))\n",
+    "print(\"Sentences are \", sentences)\n",
+    "\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "8408bb2d-8ba5-48ec-8042-d7e2afad1bf8",
+   "metadata": {},
+   "source": [
+    "##  Step 2: Term Frequency matrix"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "d1f5c743-73b9-4b4e-83f3-7c3650336677",
+   "metadata": {},
+   "source": [
+    "#### Function to calculate similarity\u000b",
+    "(count the number of common words)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 10,
+   "id": "518e98a7-b646-459c-8302-403ebcc53e6f",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Similarity between sentence1 and sentence2: 1\n"
+     ]
+    }
+   ],
+   "source": [
+    "import numpy as np\n",
+    "from scipy.spatial.distance import cosine\n",
+    "\n",
+    "def sentence_similarity(sent1, sent2):\n",
+    "    sent1 = [w.lower() for w in sent1]\n",
+    "    sent2 = [w.lower() for w in sent2]\n",
+    "    \n",
+    "    all_words = list(set(sent1 + sent2))\n",
+    "    vector1 = [0] * len(all_words)\n",
+    "    vector2 = [0] * len(all_words)\n",
+    "    \n",
+    "    # build the vector for the first sentence\n",
+    "    for w in sent1:\n",
+    "        vector1[all_words.index(w)] += 1\n",
+    "    \n",
+    "    # build the vector for the second sentence\n",
+    "    for w in sent2:\n",
+    "        vector2[all_words.index(w)] += 1\n",
+    "    \n",
+    "    # calculate cosine similarity\n",
+    "    similarity = 1 - cosine(vector1, vector2)\n",
+    "    \n",
+    "    return similarity if np.isfinite(similarity) else 0.0\n",
+    "\n",
+    "# Read sentences from a file\n",
+    "file_path = \"C:/Users/shakkerar/Desktop/Semester2_content/TBA/text_summary/Text2.txt\"\n",
+    "with open(file_path, \"r\") as file:\n",
+    "    filedata = file.readline()\n",
+    "    sentences = [sentence.strip() for sentence in filedata.split(\".\")]\n",
+    "\n",
+    "# Example usage\n",
+    "sentence1 = sentences[0].split()\n",
+    "sentence2 = sentences[1].split()\n",
+    "similarity_value = sentence_similarity(sentence1, sentence2)\n",
+    "\n",
+    "print(f\"Similarity between sentence1 and sentence2: {similarity_value}\")\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "c8a4403c-f139-4514-bdb4-996d1f5ef8c4",
+   "metadata": {},
+   "source": [
+    "## Create the similarity matrix "
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 11,
+   "id": "ab25fa05-bc07-43b6-98e8-b3bfd4acc6af",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Smilarity matrix \n",
+      " [[0.         1.         1.         0.76796953 0.75592895 0.54358283\n",
+      "  0.76665188 0.59705025 0.36905087 0.41403934 0.49051147 0.59705025\n",
+      "  0.76665188 0.55078248 0.53231522 0.60324935 0.6382437  0.42192651\n",
+      "  0.51479156 0.59705025 0.76665188 1.        ]\n",
+      " [1.         0.         1.         0.76796953 0.75592895 0.54358283\n",
+      "  0.76665188 0.59705025 0.36905087 0.41403934 0.49051147 0.59705025\n",
+      "  0.76665188 0.55078248 0.53231522 0.60324935 0.6382437  0.42192651\n",
+      "  0.51479156 0.59705025 0.76665188 1.        ]\n",
+      " [1.         1.         0.         0.76796953 0.75592895 0.54358283\n",
+      "  0.76665188 0.59705025 0.36905087 0.41403934 0.49051147 0.59705025\n",
+      "  0.76665188 0.55078248 0.53231522 0.60324935 0.6382437  0.42192651\n",
+      "  0.51479156 0.59705025 0.76665188 1.        ]\n",
+      " [0.76796953 0.76796953 0.76796953 0.         0.82403064 0.38076961\n",
+      "  0.7441339  0.45585833 0.33506522 0.38745184 0.45046786 0.45585833\n",
+      "  0.7441339  0.43634156 0.46187439 0.50118161 0.56231294 0.39483254\n",
+      "  0.47276581 0.45585833 0.7441339  1.        ]\n",
+      " [0.75592895 0.75592895 0.75592895 0.82403064 0.         0.7190925\n",
+      "  0.95784149 0.78982324 0.65094455 0.73029674 0.7840702  0.78982324\n",
+      "  0.95784149 0.77974774 0.79066594 0.8705715  0.89122356 0.73387218\n",
+      "  0.8086937  0.78982324 0.95784149 1.        ]\n",
+      " [0.54358283 0.54358283 0.54358283 0.38076961 0.7190925  0.\n",
+      "  0.76244258 0.9428518  0.8340501  0.82751052 0.86958918 0.9428518\n",
+      "  0.76244258 0.90248526 0.8819171  0.86315076 0.83712011 0.80273202\n",
+      "  0.85698506 0.9428518  0.76244258 1.        ]\n",
+      " [0.76665188 0.76665188 0.76665188 0.7441339  0.95784149 0.76244258\n",
+      "  0.         0.82424514 0.71519313 0.78180364 0.82261275 0.82424514\n",
+      "  1.         0.81673669 0.81441102 0.89518344 0.91575863 0.78621363\n",
+      "  0.84894283 0.82424514 1.         1.        ]\n",
+      " [0.59705025 0.59705025 0.59705025 0.45585833 0.78982324 0.9428518\n",
+      "  0.82424514 0.         0.78684418 0.84430927 0.86903021 1.\n",
+      "  0.82424514 0.83227087 0.81454739 0.90683162 0.869819   0.85187405\n",
+      "  0.90035389 1.         0.82424514 1.        ]\n",
+      " [0.36905087 0.36905087 0.36905087 0.33506522 0.65094455 0.8340501\n",
+      "  0.71519313 0.78684418 0.         0.97453451 0.91869521 0.78684418\n",
+      "  0.71519313 0.888668   0.88782246 0.84059577 0.85188556 0.95272887\n",
+      "  0.90875812 0.78684418 0.71519313 1.        ]\n",
+      " [0.41403934 0.41403934 0.41403934 0.38745184 0.73029674 0.82751052\n",
+      "  0.78180364 0.84430927 0.97453451 0.         0.9477582  0.84430927\n",
+      "  0.78180364 0.87750885 0.88417554 0.900682   0.90777516 0.98885528\n",
+      "  0.95322714 0.84430927 0.78180364 1.        ]\n",
+      " [0.49051147 0.49051147 0.49051147 0.45046786 0.7840702  0.86958918\n",
+      "  0.82261275 0.86903021 0.91869521 0.9477582  0.         0.86903021\n",
+      "  0.82261275 0.92069431 0.93792284 0.91796475 0.92452261 0.91550964\n",
+      "  0.98045351 0.86903021 0.82261275 1.        ]\n",
+      " [0.59705025 0.59705025 0.59705025 0.45585833 0.78982324 0.9428518\n",
+      "  0.82424514 1.         0.78684418 0.84430927 0.86903021 0.\n",
+      "  0.82424514 0.83227087 0.81454739 0.90683162 0.869819   0.85187405\n",
+      "  0.90035389 1.         0.82424514 1.        ]\n",
+      " [0.76665188 0.76665188 0.76665188 0.7441339  0.95784149 0.76244258\n",
+      "  1.         0.82424514 0.71519313 0.78180364 0.82261275 0.82424514\n",
+      "  0.         0.81673669 0.81441102 0.89518344 0.91575863 0.78621363\n",
+      "  0.84894283 0.82424514 1.         1.        ]\n",
+      " [0.55078248 0.55078248 0.55078248 0.43634156 0.77974774 0.90248526\n",
+      "  0.81673669 0.83227087 0.888668   0.87750885 0.92069431 0.83227087\n",
+      "  0.81673669 0.         0.98921136 0.93477701 0.92817165 0.83714663\n",
+      "  0.88792218 0.83227087 0.81673669 1.        ]\n",
+      " [0.53231522 0.53231522 0.53231522 0.46187439 0.79066594 0.8819171\n",
+      "  0.81441102 0.81454739 0.88782246 0.88417554 0.93792284 0.81454739\n",
+      "  0.81441102 0.98921136 0.         0.92494509 0.93877416 0.83666003\n",
+      "  0.89601052 0.81454739 0.81441102 1.        ]\n",
+      " [0.60324935 0.60324935 0.60324935 0.50118161 0.8705715  0.86315076\n",
+      "  0.89518344 0.90683162 0.84059577 0.900682   0.91796475 0.90683162\n",
+      "  0.89518344 0.93477701 0.92494509 0.         0.98005115 0.89984254\n",
+      "  0.93870092 0.90683162 0.89518344 1.        ]\n",
+      " [0.6382437  0.6382437  0.6382437  0.56231294 0.89122356 0.83712011\n",
+      "  0.91575863 0.869819   0.85188556 0.90777516 0.92452261 0.869819\n",
+      "  0.91575863 0.92817165 0.93877416 0.98005115 0.         0.89888651\n",
+      "  0.93434953 0.869819   0.91575863 1.        ]\n",
+      " [0.42192651 0.42192651 0.42192651 0.39483254 0.73387218 0.80273202\n",
+      "  0.78621363 0.85187405 0.95272887 0.98885528 0.91550964 0.85187405\n",
+      "  0.78621363 0.83714663 0.83666003 0.89984254 0.89888651 0.\n",
+      "  0.9502684  0.85187405 0.78621363 1.        ]\n",
+      " [0.51479156 0.51479156 0.51479156 0.47276581 0.8086937  0.85698506\n",
+      "  0.84894283 0.90035389 0.90875812 0.95322714 0.98045351 0.90035389\n",
+      "  0.84894283 0.88792218 0.89601052 0.93870092 0.93434953 0.9502684\n",
+      "  0.         0.90035389 0.84894283 1.        ]\n",
+      " [0.59705025 0.59705025 0.59705025 0.45585833 0.78982324 0.9428518\n",
+      "  0.82424514 1.         0.78684418 0.84430927 0.86903021 1.\n",
+      "  0.82424514 0.83227087 0.81454739 0.90683162 0.869819   0.85187405\n",
+      "  0.90035389 0.         0.82424514 1.        ]\n",
+      " [0.76665188 0.76665188 0.76665188 0.7441339  0.95784149 0.76244258\n",
+      "  1.         0.82424514 0.71519313 0.78180364 0.82261275 0.82424514\n",
+      "  1.         0.81673669 0.81441102 0.89518344 0.91575863 0.78621363\n",
+      "  0.84894283 0.82424514 0.         1.        ]\n",
+      " [1.         1.         1.         1.         1.         1.\n",
+      "  1.         1.         1.         1.         1.         1.\n",
+      "  1.         1.         1.         1.         1.         1.\n",
+      "  1.         1.         1.         0.        ]]\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "C:\\Users\\shakkerar\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\site-packages\\scipy\\spatial\\distance.py:647: RuntimeWarning: invalid value encountered in divide\n",
+      "  dist = 1.0 - uv / math.sqrt(uu * vv)\n"
+     ]
+    }
+   ],
+   "source": [
+    "similarity_matrix = np.zeros((len(sentences), len(sentences)))\n",
+    " \n",
+    "for idx1 in range(len(sentences)):\n",
+    "        for idx2 in range(len(sentences)):\n",
+    "             if idx1 == idx2: #ignore if both are same sentences\n",
+    "                continue \n",
+    "             similarity_matrix[idx1][idx2] = sentence_similarity(sentences[idx1], sentences[idx2])\n",
+    "\n",
+    "print(\"Smilarity matrix \\n\", similarity_matrix)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "e6177b4b-c399-48f8-a810-99781035900c",
+   "metadata": {},
+   "source": [
+    "## Step3 : Rank sentences in similarity martix"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 14,
+   "id": "4f91e5c0-beac-4c6a-b7c2-a5867bae2181",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "scores {0: 0.038792291549875735, 1: 0.038792291549875735, 2: 0.038792291549875735, 3: 0.03504226885254877, 4: 0.04670892932286837, 5: 0.045269858911682885, 6: 0.04796446129502789, 7: 0.04670776096643844, 8: 0.04320111864089751, 9: 0.04518991908693654, 10: 0.046650073977712286, 11: 0.04670776096643844, 12: 0.04796446129502789, 13: 0.046353707785344304, 14: 0.04619270536851184, 15: 0.048256176300258434, 16: 0.04859630065916633, 17: 0.04493742752694101, 18: 0.047280706479351536, 19: 0.04670776096643844, 20: 0.047964461295027884, 21: 0.05592726565375413}\n"
+     ]
+    }
+   ],
+   "source": [
+    "# Step 3 - Rank sentences in similarity martix\n",
+    "from nltk.corpus import stopwords #you can remove stop words for speed\n",
+    "from nltk.cluster.util import cosine_distance\n",
+    "import numpy as np\n",
+    "import networkx as nx\n",
+    "sentence_similarity_graph = nx.from_numpy_array(similarity_matrix)\n",
+    "scores = nx.pagerank(sentence_similarity_graph)\n",
+    "print(\"scores\", scores)\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "1984fbae-4729-4c59-be1a-16c031a1c6d8",
+   "metadata": {},
+   "source": [
+    "## Step4:  Sort sentences by pagerank"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 15,
+   "id": "c4344e4e-b252-4af3-bb39-a2a59b603ec4",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Indexes of top ranked_sentence order are \n",
+      "\n",
+      " [(0.05592726565375413, ''), (0.04859630065916633, 'I DO NOT LIKE THEM WITH A MOUSE'), (0.048256176300258434, 'I DO NOT LIKE THEM IN A HOUSE'), (0.04796446129502789, 'I DO NOT LIKE THEM, SAM-I-AM'), (0.04796446129502789, 'I DO NOT LIKE THEM, SAM-I-AM'), (0.047964461295027884, 'I DO NOT LIKE THEM, SAM-I-AM'), (0.047280706479351536, 'I DO NOT LIKE THEM ANYWHERE'), (0.04670892932286837, 'I DO NOT LIKE THAT SAM-I-AM!'), (0.04670776096643844, 'I DO NOT LIKE GREEN EGGS AND HAM'), (0.04670776096643844, 'I DO NOT LIKE GREEN EGGS AND HAM'), (0.04670776096643844, 'I DO NOT LIKE GREEN EGGS AND HAM'), (0.046650073977712286, 'I WOULD NOT LIKE THEM ANYWHERE'), (0.046353707785344304, 'WOULD YOU LIKE THEM IN A HOUSE?'), (0.04619270536851184, 'WOULD YOU LIKE THEN WITH A MOUSE?'), (0.045269858911682885, 'DO WOULD YOU LIKE GREEN EGGS AND HAM?'), (0.04518991908693654, 'I WOULD NOT LIKE THEM HERE OR THERE'), (0.04493742752694101, 'I DO NOT LIKE THEM HERE OR THERE'), (0.04320111864089751, 'WOULD YOU LIKE THEM HERE OR THERE?'), (0.038792291549875735, 'SAM I AM'), (0.038792291549875735, 'I AM SAM'), (0.038792291549875735, 'I AM SAM'), (0.03504226885254877, 'THAT SAM-I-AM! THAT SAM-I-AM!')]\n"
+     ]
+    }
+   ],
+   "source": [
+    "# Step 4 - Sort the rank and pick top sentences\n",
+    "ranked_sentence = sorted(((scores[i],s) for i,s in enumerate(sentences)), reverse=True)    \n",
+    "print(\"Indexes of top ranked_sentence order are \\n\\n\", ranked_sentence)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "46c6bbb2-1b40-4bf1-ab04-e5c688e089cb",
+   "metadata": {},
+   "source": [
+    "## Step 5 - How many sentences to pick"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 16,
+   "id": "97e6f0cc-31a6-49fa-b0b5-f1a079ccf787",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdin",
+     "output_type": "stream",
+     "text": [
+      "How many sentences do you want in the summary?  3\n"
+     ]
+    }
+   ],
+   "source": [
+    "n = int(input(\"How many sentences do you want in the summary? \"))\n",
+    "#n=2\n",
+    "summarize_text = []\n",
+    "for i in range(n):\n",
+    "      summarize_text.append(\" \".join(ranked_sentence[i][1]))\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "60789ccb-12f4-4012-8e79-0b623c892109",
+   "metadata": {},
+   "source": [
+    "##  Step 6 : Finish off by printing summary"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 17,
+   "id": "7a9b2a0a-c456-44cd-9e76-7ea3098b3360",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Summarize Text: \n",
+      " . I   D O   N O T   L I K E   T H E M   W I T H   A   M O U S E. I   D O   N O T   L I K E   T H E M   I N   A   H O U S E\n"
+     ]
+    }
+   ],
+   "source": [
+    "print(\"Summarize Text: \\n\", \". \".join(summarize_text))"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "1c84cbb3-e2c6-43b0-afa9-3f55583728d3",
+   "metadata": {},
+   "source": [
+    "# Text 3"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "698555e8-1da5-4b7f-8f1e-56cf41177605",
+   "metadata": {},
+   "source": [
+    "## Step 1: Create the “vocabulary”"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 19,
+   "id": "30a9706a-7b77-4202-9c04-51abd135f502",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "As an institution of higher learning, Sacred Heart University places special emphasis on academic integrity, which is a commitment to the fundamental values of honesty, trust, fairness, respect, and responsibility\n",
+      "Only when these values are widely respected and practiced by all members of the University students, faculty, administrators, and staff can the University maintain a culture that promotes free exploration of knowledge, constructive debate, genuine learning, effective research, fair assessment of student progress, and development of members characters\n",
+      "These aims of the University require that its members exercise mutual responsibilities\n",
+      "At its core, academic integrity is secured by a principled commitment to carry out these responsibilities, not by rules and penalties\n",
+      "Students and faculty should strive to create an academic environment that is honest, fair, and respectful of all\n",
+      "They do this by evaluating others work fairly, by responding to others ideas critically yet courteously, by respecting others intellectual and physical property, and by nurturing the values of academic integrity in all contexts of University life\n",
+      "Appropriate disciplinary action will be taken for violations of academic integrity, including plagiarism, cheating, any use of materials for an assignment or exam that is not permitted by the instructor, and theft or mutilation of intellectual materials or other University equipment\n",
+      "Faculty will assign failing grades for violations of the University policy on academic integrity and students may immediately receive an F for a course in which they commit a violation\n",
+      "Violations of academic integrity are kept on file second violations will bring additional sanctions, up to dismissal from the University\n",
+      "For any disciplinary action, the University affords the student the right of due process in an appeals procedure\n",
+      "All matriculated students will be provided with a full description of the University standards for academic integrity, consequences for violations, and the appeals procedure.\n",
+      "Sentences are  [['As', 'an', 'institution', 'of', 'higher', 'learning,', 'Sacred', 'Heart', 'University', 'places', 'special', 'emphasis', 'on', 'academic', 'integrity,', 'which', 'is', 'a', 'commitment', 'to', 'the', 'fundamental', 'values', 'of', 'honesty,', 'trust,', 'fairness,', 'respect,', 'and', 'responsibility'], ['Only', 'when', 'these', 'values', 'are', 'widely', 'respected', 'and', 'practiced', 'by', 'all', 'members', 'of', 'the', 'University', 'students,', 'faculty,', 'administrators,', 'and', 'staff', 'can', 'the', 'University', 'maintain', 'a', 'culture', 'that', 'promotes', 'free', 'exploration', 'of', 'knowledge,', 'constructive', 'debate,', 'genuine', 'learning,', 'effective', 'research,', 'fair', 'assessment', 'of', 'student', 'progress,', 'and', 'development', 'of', 'members', 'characters'], ['These', 'aims', 'of', 'the', 'University', 'require', 'that', 'its', 'members', 'exercise', 'mutual', 'responsibilities'], ['At', 'its', 'core,', 'academic', 'integrity', 'is', 'secured', 'by', 'a', 'principled', 'commitment', 'to', 'carry', 'out', 'these', 'responsibilities,', 'not', 'by', 'rules', 'and', 'penalties'], ['Students', 'and', 'faculty', 'should', 'strive', 'to', 'create', 'an', 'academic', 'environment', 'that', 'is', 'honest,', 'fair,', 'and', 'respectful', 'of', 'all'], ['They', 'do', 'this', 'by', 'evaluating', 'others', 'work', 'fairly,', 'by', 'responding', 'to', 'others', 'ideas', 'critically', 'yet', 'courteously,', 'by', 'respecting', 'others', 'intellectual', 'and', 'physical', 'property,', 'and', 'by', 'nurturing', 'the', 'values', 'of', 'academic', 'integrity', 'in', 'all', 'contexts', 'of', 'University', 'life'], ['Appropriate', 'disciplinary', 'action', 'will', 'be', 'taken', 'for', 'violations', 'of', 'academic', 'integrity,', 'including', 'plagiarism,', 'cheating,', 'any', 'use', 'of', 'materials', 'for', 'an', 'assignment', 'or', 'exam', 'that', 'is', 'not', 'permitted', 'by', 'the', 'instructor,', 'and', 'theft', 'or', 'mutilation', 'of', 'intellectual', 'materials', 'or', 'other', 'University', 'equipment'], ['Faculty', 'will', 'assign', 'failing', 'grades', 'for', 'violations', 'of', 'the', 'University', 'policy', 'on', 'academic', 'integrity', 'and', 'students', 'may', 'immediately', 'receive', 'an', 'F', 'for', 'a', 'course', 'in', 'which', 'they', 'commit', 'a', 'violation'], ['Violations', 'of', 'academic', 'integrity', 'are', 'kept', 'on', 'file', 'second', 'violations', 'will', 'bring', 'additional', 'sanctions,', 'up', 'to', 'dismissal', 'from', 'the', 'University'], ['For', 'any', 'disciplinary', 'action,', 'the', 'University', 'affords', 'the', 'student', 'the', 'right', 'of', 'due', 'process', 'in', 'an', 'appeals', 'procedure'], ['All', 'matriculated', 'students', 'will', 'be', 'provided', 'with', 'a', 'full', 'description', 'of', 'the', 'University', 'standards', 'for', 'academic', 'integrity,', 'consequences', 'for', 'violations,', 'and', 'the', 'appeals', 'procedure.']]\n"
+     ]
+    }
+   ],
+   "source": [
+    "file = open(\"C:/Users/shakkerar/Desktop/Semester2_content/TBA/text_summary/Text3.txt\")\n",
+    "#This file contains one paragraph of multiple sentences\n",
+    "filedata = file.readlines()\n",
+    "article = filedata[0].split(\". \") #Just do the first paragraph\n",
+    "\n",
+    "sentences = []\n",
+    "for sentence in article:\n",
+    "    print(sentence)\n",
+    "    sentences.append(sentence.replace(\"[^a-zA-Z]\", \" \").split(\" \"))\n",
+    "print(\"Sentences are \", sentences)\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "142cfc14-4ec8-41e5-980c-53e82121ece9",
+   "metadata": {},
+   "source": [
+    "## Step 2: Term Frequency matrix¶"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "50fe8d90-dd8e-4ab0-96d6-93a6759700b6",
+   "metadata": {},
+   "source": [
+    "#### Function to calculate similarity\u000b",
+    "(count the number of common words)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 20,
+   "id": "ea07c4f5-294c-44c0-ae8e-c6d3014382b6",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Similarity between sentence1 and sentence2: 0.375\n"
+     ]
+    }
+   ],
+   "source": [
+    "import numpy as np\n",
+    "from scipy.spatial.distance import cosine\n",
+    "\n",
+    "def sentence_similarity(sent1, sent2):\n",
+    "    sent1 = [w.lower() for w in sent1]\n",
+    "    sent2 = [w.lower() for w in sent2]\n",
+    "    \n",
+    "    all_words = list(set(sent1 + sent2))\n",
+    "    vector1 = [0] * len(all_words)\n",
+    "    vector2 = [0] * len(all_words)\n",
+    "    \n",
+    "    # build the vector for the first sentence\n",
+    "    for w in sent1:\n",
+    "        vector1[all_words.index(w)] += 1\n",
+    "    \n",
+    "    # build the vector for the second sentence\n",
+    "    for w in sent2:\n",
+    "        vector2[all_words.index(w)] += 1\n",
+    "    \n",
+    "    # calculate cosine similarity\n",
+    "    similarity = 1 - cosine(vector1, vector2)\n",
+    "    \n",
+    "    return similarity if np.isfinite(similarity) else 0.0\n",
+    "\n",
+    "# Read sentences from a file\n",
+    "file_path = \"C:/Users/shakkerar/Desktop/Semester2_content/TBA/text_summary/Text3.txt\"\n",
+    "with open(file_path, \"r\") as file:\n",
+    "    filedata = file.readline()\n",
+    "    sentences = [sentence.strip() for sentence in filedata.split(\".\")]\n",
+    "\n",
+    "# Example usage\n",
+    "sentence1 = sentences[0].split()\n",
+    "sentence2 = sentences[1].split()\n",
+    "similarity_value = sentence_similarity(sentence1, sentence2)\n",
+    "\n",
+    "print(f\"Similarity between sentence1 and sentence2: {similarity_value}\")\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "fd2604c7-f116-4f03-9323-e4ba4777a38e",
+   "metadata": {},
+   "source": [
+    "## Create the similarity matrix"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 21,
+   "id": "ca2ac0d2-bd36-4268-ae01-b13158e3d047",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Smilarity matrix \n",
+      " [[0.         0.96408679 0.91773202 0.9715299  0.96209027 0.95867539\n",
+      "  0.97276202 0.95802411 0.9497064  0.96468382 0.96379733 1.        ]\n",
+      " [0.96408679 0.         0.91284271 0.95628677 0.97171272 0.95258505\n",
+      "  0.94166394 0.91976052 0.8961105  0.96102778 0.96865144 1.        ]\n",
+      " [0.91773202 0.91284271 0.         0.92972909 0.85374272 0.88669156\n",
+      "  0.88301496 0.85855895 0.85055163 0.88036906 0.88714278 1.        ]\n",
+      " [0.9715299  0.95628677 0.92972909 0.         0.9376555  0.96847777\n",
+      "  0.96542973 0.94875872 0.9411562  0.95714588 0.9652098  1.        ]\n",
+      " [0.96209027 0.97171272 0.85374272 0.9376555  0.         0.95014115\n",
+      "  0.95330282 0.93814445 0.91862076 0.95845449 0.97256438 1.        ]\n",
+      " [0.95867539 0.95258505 0.88669156 0.96847777 0.95014115 0.\n",
+      "  0.96674758 0.96039208 0.93740165 0.96751458 0.96753409 1.        ]\n",
+      " [0.97276202 0.94166394 0.88301496 0.96542973 0.95330282 0.96674758\n",
+      "  0.         0.97403714 0.96731179 0.95436984 0.96468364 1.        ]\n",
+      " [0.95802411 0.91976052 0.85855895 0.94875872 0.93814445 0.96039208\n",
+      "  0.97403714 0.         0.97444335 0.94297405 0.9537225  1.        ]\n",
+      " [0.9497064  0.8961105  0.85055163 0.9411562  0.91862076 0.93740165\n",
+      "  0.96731179 0.97444335 0.         0.92685689 0.95050765 1.        ]\n",
+      " [0.96468382 0.96102778 0.88036906 0.95714588 0.95845449 0.96751458\n",
+      "  0.95436984 0.94297405 0.92685689 0.         0.97507375 1.        ]\n",
+      " [0.96379733 0.96865144 0.88714278 0.9652098  0.97256438 0.96753409\n",
+      "  0.96468364 0.9537225  0.95050765 0.97507375 0.         1.        ]\n",
+      " [1.         1.         1.         1.         1.         1.\n",
+      "  1.         1.         1.         1.         1.         0.        ]]\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "C:\\Users\\shakkerar\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\site-packages\\scipy\\spatial\\distance.py:647: RuntimeWarning: invalid value encountered in divide\n",
+      "  dist = 1.0 - uv / math.sqrt(uu * vv)\n"
+     ]
+    }
+   ],
+   "source": [
+    "similarity_matrix = np.zeros((len(sentences), len(sentences)))\n",
+    " \n",
+    "for idx1 in range(len(sentences)):\n",
+    "        for idx2 in range(len(sentences)):\n",
+    "             if idx1 == idx2: #ignore if both are same sentences\n",
+    "                continue \n",
+    "             similarity_matrix[idx1][idx2] = sentence_similarity(sentences[idx1], sentences[idx2])\n",
+    "\n",
+    "print(\"Smilarity matrix \\n\", similarity_matrix)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "1f039b23-0ca3-4225-b522-f6666e140b28",
+   "metadata": {},
+   "source": [
+    "## Step3 : Rank sentences in similarity martix"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 22,
+   "id": "a37644b8-3af5-400d-84fb-5b49e8a54417",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "scores {0: 0.08407223243428717, 1: 0.08312395809814384, 2: 0.07912220010061635, 3: 0.08378699947295691, 4: 0.08292735062347582, 5: 0.08361211068245716, 6: 0.08379828039929847, 7: 0.08301302271983879, 8: 0.08221701366932087, 9: 0.08342201608621087, 10: 0.08397345013149922, 11: 0.08693136558189431}\n"
+     ]
+    }
+   ],
+   "source": [
+    "# Step 3 - Rank sentences in similarity martix\n",
+    "from nltk.corpus import stopwords #you can remove stop words for speed\n",
+    "from nltk.cluster.util import cosine_distance\n",
+    "import numpy as np\n",
+    "import networkx as nx\n",
+    "sentence_similarity_graph = nx.from_numpy_array(similarity_matrix)\n",
+    "scores = nx.pagerank(sentence_similarity_graph)\n",
+    "print(\"scores\", scores)\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "c80bea0c-b441-4c2f-91dc-5dc7f2731f62",
+   "metadata": {},
+   "source": [
+    "## Step4: Sort sentences by pagerank"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 23,
+   "id": "f55815cf-510b-4bd4-aec4-dafae80b1507",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Indexes of top ranked_sentence order are \n",
+      "\n",
+      " [(0.08693136558189431, ''), (0.08407223243428717, 'As an institution of higher learning, Sacred Heart University places special emphasis on academic integrity, which is a commitment to the fundamental values of honesty, trust, fairness, respect, and responsibility'), (0.08397345013149922, 'All matriculated students will be provided with a full description of the University standards for academic integrity, consequences for violations, and the appeals procedure'), (0.08379828039929847, 'Appropriate disciplinary action will be taken for violations of academic integrity, including plagiarism, cheating, any use of materials for an assignment or exam that is not permitted by the instructor, and theft or mutilation of intellectual materials or other University equipment'), (0.08378699947295691, 'At its core, academic integrity is secured by a principled commitment to carry out these responsibilities, not by rules and penalties'), (0.08361211068245716, 'They do this by evaluating others work fairly, by responding to others ideas critically yet courteously, by respecting others intellectual and physical property, and by nurturing the values of academic integrity in all contexts of University life'), (0.08342201608621087, 'For any disciplinary action, the University affords the student the right of due process in an appeals procedure'), (0.08312395809814384, 'Only when these values are widely respected and practiced by all members of the University students, faculty, administrators, and staff can the University maintain a culture that promotes free exploration of knowledge, constructive debate, genuine learning, effective research, fair assessment of student progress, and development of members characters'), (0.08301302271983879, 'Faculty will assign failing grades for violations of the University policy on academic integrity and students may immediately receive an F for a course in which they commit a violation'), (0.08292735062347582, 'Students and faculty should strive to create an academic environment that is honest, fair, and respectful of all'), (0.08221701366932087, 'Violations of academic integrity are kept on file second violations will bring additional sanctions, up to dismissal from the University'), (0.07912220010061635, 'These aims of the University require that its members exercise mutual responsibilities')]\n"
+     ]
+    }
+   ],
+   "source": [
+    "# Step 4 - Sort the rank and pick top sentences\n",
+    "ranked_sentence = sorted(((scores[i],s) for i,s in enumerate(sentences)), reverse=True)    \n",
+    "print(\"Indexes of top ranked_sentence order are \\n\\n\", ranked_sentence)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "beb16bcf-f768-4d21-9040-d77dbb108032",
+   "metadata": {},
+   "source": [
+    "## Step 5 - How many sentences to pick"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 26,
+   "id": "94ee82a7-66a9-42cb-a8e0-d8a63d0b0c02",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdin",
+     "output_type": "stream",
+     "text": [
+      "How many sentences do you want in the summary?  3\n"
+     ]
+    }
+   ],
+   "source": [
+    "n = int(input(\"How many sentences do you want in the summary? \"))\n",
+    "#n=2\n",
+    "summarize_text = []\n",
+    "for i in range(n):\n",
+    "      summarize_text.append(\" \".join(ranked_sentence[i][1]))\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "3384fff7-b899-482a-a93d-df49601ad166",
+   "metadata": {},
+   "source": [
+    "## Step 6 : Finish off by printing summary"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 27,
+   "id": "75856810-8174-482f-8798-632e0d117896",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Summarize Text: \n",
+      " . A s   a n   i n s t i t u t i o n   o f   h i g h e r   l e a r n i n g ,   S a c r e d   H e a r t   U n i v e r s i t y   p l a c e s   s p e c i a l   e m p h a s i s   o n   a c a d e m i c   i n t e g r i t y ,   w h i c h   i s   a   c o m m i t m e n t   t o   t h e   f u n d a m e n t a l   v a l u e s   o f   h o n e s t y ,   t r u s t ,   f a i r n e s s ,   r e s p e c t ,   a n d   r e s p o n s i b i l i t y. A l l   m a t r i c u l a t e d   s t u d e n t s   w i l l   b e   p r o v i d e d   w i t h   a   f u l l   d e s c r i p t i o n   o f   t h e   U n i v e r s i t y   s t a n d a r d s   f o r   a c a d e m i c   i n t e g r i t y ,   c o n s e q u e n c e s   f o r   v i o l a t i o n s ,   a n d   t h e   a p p e a l s   p r o c e d u r e\n"
+     ]
+    }
+   ],
+   "source": [
+    "print(\"Summarize Text: \\n\", \". \".join(summarize_text))"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "f725c61f-c85c-479f-9290-eb71521d4a78",
+   "metadata": {},
+   "source": [
+    "# text4"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "bf1291d0-4f38-4384-b64d-8ae5d1cfa0c9",
+   "metadata": {},
+   "source": [
+    "## Step 1: Create the “vocabulary”"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 28,
+   "id": "23512060-974a-4f32-8ff2-80faafb12bb1",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Imagine there's no heaven\n",
+      "It's easy if you try\n",
+      "No hell below us\n",
+      "Above us, only sky\n",
+      "Imagine all the people livin' for today\n",
+      "Imagine there's no countries\n",
+      "It isn't hard to do\n",
+      "Nothing to kill or die for and no religion, too\n",
+      "Imagine all the people livin' life in peace\n",
+      "You may say I'm a dreamer but I'm not the only one\n",
+      "I hope someday you'll join us and the world will be as one\n",
+      "Imagine no possessions\n",
+      "I wonder if you can\n",
+      "No need for greed or hunger\n",
+      "A brotherhood of man\n",
+      "Imagine all the people sharing all the world\n",
+      "\n",
+      "\n",
+      "Sentences are  [['Imagine', \"there's\", 'no', 'heaven'], [\"It's\", 'easy', 'if', 'you', 'try'], ['No', 'hell', 'below', 'us'], ['Above', 'us,', 'only', 'sky'], ['Imagine', 'all', 'the', 'people', \"livin'\", 'for', 'today'], ['Imagine', \"there's\", 'no', 'countries'], ['It', \"isn't\", 'hard', 'to', 'do'], ['Nothing', 'to', 'kill', 'or', 'die', 'for', 'and', 'no', 'religion,', 'too'], ['Imagine', 'all', 'the', 'people', \"livin'\", 'life', 'in', 'peace'], ['You', 'may', 'say', \"I'm\", 'a', 'dreamer', 'but', \"I'm\", 'not', 'the', 'only', 'one'], ['I', 'hope', 'someday', \"you'll\", 'join', 'us', 'and', 'the', 'world', 'will', 'be', 'as', 'one'], ['Imagine', 'no', 'possessions'], ['I', 'wonder', 'if', 'you', 'can'], ['No', 'need', 'for', 'greed', 'or', 'hunger'], ['A', 'brotherhood', 'of', 'man'], ['Imagine', 'all', 'the', 'people', 'sharing', 'all', 'the', 'world'], ['\\n']]\n"
+     ]
+    }
+   ],
+   "source": [
+    "file = open(\"C:/Users/shakkerar/Desktop/Semester2_content/TBA/text_summary/Text4.txt\")\n",
+    "#This file contains one paragraph of multiple sentences\n",
+    "filedata = file.readlines()\n",
+    "article = filedata[0].split(\". \") #Just do the first paragraph\n",
+    "\n",
+    "sentences = []\n",
+    "for sentence in article:\n",
+    "    print(sentence)\n",
+    "    sentences.append(sentence.replace(\"[^a-zA-Z]\", \" \").split(\" \"))\n",
+    "print(\"Sentences are \", sentences)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "4601b18c-4937-4754-87d0-1182d748682b",
+   "metadata": {},
+   "source": [
+    "## Step 2: Term Frequency matrix"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "c3763fbc-420a-4daf-ae76-ef7d7f18e201",
+   "metadata": {},
+   "source": [
+    "#### Function to calculate similarity\u000b",
+    "(count the number of common words)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 31,
+   "id": "203f6ea5-8ded-47ea-a871-c70ed3190009",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Similarity between sentence1 and sentence2: 0.0\n"
+     ]
+    }
+   ],
+   "source": [
+    "import numpy as np\n",
+    "from scipy.spatial.distance import cosine\n",
+    "\n",
+    "def sentence_similarity(sent1, sent2):\n",
+    "    sent1 = [w.lower() for w in sent1]\n",
+    "    sent2 = [w.lower() for w in sent2]\n",
+    "    \n",
+    "    all_words = list(set(sent1 + sent2))\n",
+    "    vector1 = [0] * len(all_words)\n",
+    "    vector2 = [0] * len(all_words)\n",
+    "    \n",
+    "    # build the vector for the first sentence\n",
+    "    for w in sent1:\n",
+    "        vector1[all_words.index(w)] += 1\n",
+    "    \n",
+    "    # build the vector for the second sentence\n",
+    "    for w in sent2:\n",
+    "        vector2[all_words.index(w)] += 1\n",
+    "    \n",
+    "    # calculate cosine similarity\n",
+    "    similarity = 1 - cosine(vector1, vector2)\n",
+    "    \n",
+    "    return similarity if np.isfinite(similarity) else 0.0\n",
+    "\n",
+    "# Read sentences from a file\n",
+    "file_path = \"C:/Users/shakkerar/Desktop/Semester2_content/TBA/text_summary/Text4.txt\"\n",
+    "with open(file_path, \"r\") as file:\n",
+    "    filedata = file.readline()\n",
+    "    sentences = [sentence.strip() for sentence in filedata.split(\".\")]\n",
+    "\n",
+    "# Example usage\n",
+    "sentence1 = sentences[0].split()\n",
+    "sentence2 = sentences[1].split()\n",
+    "similarity_value = sentence_similarity(sentence1, sentence2)\n",
+    "\n",
+    "print(f\"Similarity between sentence1 and sentence2: {similarity_value}\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "2e35a5b4-768e-44f6-b969-b695a1939d45",
+   "metadata": {},
+   "source": [
+    "#### Create the similarity matrix"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 32,
+   "id": "809635ca-65a8-4193-a626-a90273f609bd",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Smilarity matrix \n",
+      " [[0.         0.56980288 0.60133779 0.55205245 0.79519787 0.91497614\n",
+      "  0.59560343 0.66825871 0.82102014 0.74819006 0.7225315  0.67718635\n",
+      "  0.66279442 0.77556673 0.62678317 0.78773357 1.        ]\n",
+      " [0.56980288 0.         0.5063517  0.74315054 0.70684542 0.6865994\n",
+      "  0.75867081 0.65335544 0.59377109 0.83688636 0.75104158 0.56533377\n",
+      "  0.7435224  0.52588499 0.54545455 0.60923565 1.        ]\n",
+      " [0.60133779 0.5063517  0.         0.74232181 0.74915264 0.6092718\n",
+      "  0.51220567 0.7089535  0.70891756 0.6846532  0.88067431 0.53033009\n",
+      "  0.63936201 0.65292863 0.61295206 0.8087458  1.        ]\n",
+      " [0.55205245 0.74315054 0.74232181 0.         0.6584864  0.58430655\n",
+      "  0.55684605 0.66134557 0.54912518 0.77781746 0.81437037 0.63900965\n",
+      "  0.69034526 0.56195149 0.60553007 0.61253065 1.        ]\n",
+      " [0.79519787 0.70684542 0.74915264 0.6584864  0.         0.7880138\n",
+      "  0.74251798 0.85153274 0.94272059 0.83811635 0.89317266 0.608627\n",
+      "  0.78563795 0.69382014 0.69325224 0.94189781 1.        ]\n",
+      " [0.91497614 0.6865994  0.6092718  0.58430655 0.7880138  0.\n",
+      "  0.7133085  0.77232629 0.7756993  0.77071559 0.74870236 0.78470825\n",
+      "  0.74873631 0.78299307 0.64948592 0.75085106 1.        ]\n",
+      " [0.59560343 0.75867081 0.51220567 0.55684605 0.74251798 0.7133085\n",
+      "  0.         0.83846656 0.57879442 0.78749923 0.77739244 0.55280732\n",
+      "  0.75211832 0.59454888 0.73568078 0.6744186  1.        ]\n",
+      " [0.66825871 0.65335544 0.7089535  0.66134557 0.85153274 0.77232629\n",
+      "  0.83846656 0.         0.71798512 0.78914577 0.85433415 0.63876065\n",
+      "  0.861361   0.76983426 0.79962905 0.77434853 1.        ]\n",
+      " [0.82102014 0.59377109 0.70891756 0.54912518 0.94272059 0.7756993\n",
+      "  0.57879442 0.71798512 0.         0.72573276 0.80477836 0.59079477\n",
+      "  0.70637136 0.63185779 0.49660854 0.9064139  1.        ]\n",
+      " [0.74819006 0.83688636 0.6846532  0.77781746 0.83811635 0.77071559\n",
+      "  0.78749923 0.78914577 0.72573276 0.         0.89742361 0.56481007\n",
+      "  0.83834081 0.72187013 0.76876771 0.77765549 1.        ]\n",
+      " [0.7225315  0.75104158 0.88067431 0.81437037 0.89317266 0.74870236\n",
+      "  0.77739244 0.85433415 0.80477836 0.89742361 0.         0.651695\n",
+      "  0.85710399 0.74885996 0.75104158 0.8789835  1.        ]\n",
+      " [0.67718635 0.56533377 0.53033009 0.63900965 0.608627   0.78470825\n",
+      "  0.55280732 0.63876065 0.59079477 0.56481007 0.651695   0.\n",
+      "  0.59594633 0.51298918 0.48995593 0.56233848 1.        ]\n",
+      " [0.66279442 0.7435224  0.63936201 0.69034526 0.78563795 0.74873631\n",
+      "  0.75211832 0.861361   0.70637136 0.83834081 0.85710399 0.59594633\n",
+      "  0.         0.75901411 0.71873832 0.68944179 1.        ]\n",
+      " [0.77556673 0.52588499 0.65292863 0.56195149 0.69382014 0.78299307\n",
+      "  0.59454888 0.76983426 0.63185779 0.72187013 0.74885996 0.51298918\n",
+      "  0.75901411 0.         0.74242587 0.69624803 1.        ]\n",
+      " [0.62678317 0.54545455 0.61295206 0.60553007 0.69325224 0.64948592\n",
+      "  0.73568078 0.79962905 0.49660854 0.76876771 0.75104158 0.48995593\n",
+      "  0.71873832 0.74242587 0.         0.66671071 1.        ]\n",
+      " [0.78773357 0.60923565 0.8087458  0.61253065 0.94189781 0.75085106\n",
+      "  0.6744186  0.77434853 0.9064139  0.77765549 0.8789835  0.56233848\n",
+      "  0.68944179 0.69624803 0.66671071 0.         1.        ]\n",
+      " [1.         1.         1.         1.         1.         1.\n",
+      "  1.         1.         1.         1.         1.         1.\n",
+      "  1.         1.         1.         1.         0.        ]]\n"
+     ]
+    }
+   ],
+   "source": [
+    "similarity_matrix = np.zeros((len(sentences), len(sentences)))\n",
+    " \n",
+    "for idx1 in range(len(sentences)):\n",
+    "        for idx2 in range(len(sentences)):\n",
+    "             if idx1 == idx2: #ignore if both are same sentences\n",
+    "                continue \n",
+    "             similarity_matrix[idx1][idx2] = sentence_similarity(sentences[idx1], sentences[idx2])\n",
+    "\n",
+    "print(\"Smilarity matrix \\n\", similarity_matrix)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "441b0b38-7868-4572-a425-3e044553d20a",
+   "metadata": {},
+   "source": [
+    "## Step3 : Rank sentences in similarity martix"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 33,
+   "id": "2d26bd29-2338-42f0-9836-ee7deb770b37",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "scores {0: 0.057360191237903355, 1: 0.05427663241932601, 2: 0.054914494302120705, 3: 0.054094253590455464, 4: 0.06234001486946403, 5: 0.059774251678194085, 6: 0.055867021536175496, 7: 0.06094868873557084, 8: 0.05746893000550939, 9: 0.06166594983386338, 10: 0.0638233400518601, 11: 0.05074900272787694, 12: 0.05961954423450885, 13: 0.05586599113653759, 14: 0.05472545017242777, 15: 0.05998279783530955, 16: 0.0765234456328965}\n"
+     ]
+    }
+   ],
+   "source": [
+    "# Step 3 - Rank sentences in similarity martix\n",
+    "from nltk.corpus import stopwords #you can remove stop words for speed\n",
+    "from nltk.cluster.util import cosine_distance\n",
+    "import numpy as np\n",
+    "import networkx as nx\n",
+    "sentence_similarity_graph = nx.from_numpy_array(similarity_matrix)\n",
+    "scores = nx.pagerank(sentence_similarity_graph)\n",
+    "print(\"scores\", scores)\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "0556ff35-8ee6-416d-a304-a07a55239931",
+   "metadata": {},
+   "source": [
+    "## Step4: Sort sentences by pagerank"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 34,
+   "id": "b97684c2-fdb7-412a-a3d5-0061b922ebb6",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Indexes of top ranked_sentence order are \n",
+      "\n",
+      " [(0.0765234456328965, ''), (0.0638233400518601, \"I hope someday you'll join us and the world will be as one\"), (0.06234001486946403, \"Imagine all the people livin' for today\"), (0.06166594983386338, \"You may say I'm a dreamer but I'm not the only one\"), (0.06094868873557084, 'Nothing to kill or die for and no religion, too'), (0.05998279783530955, 'Imagine all the people sharing all the world'), (0.059774251678194085, \"Imagine there's no countries\"), (0.05961954423450885, 'I wonder if you can'), (0.05746893000550939, \"Imagine all the people livin' life in peace\"), (0.057360191237903355, \"Imagine there's no heaven\"), (0.055867021536175496, \"It isn't hard to do\"), (0.05586599113653759, 'No need for greed or hunger'), (0.054914494302120705, 'No hell below us'), (0.05472545017242777, 'A brotherhood of man'), (0.05427663241932601, \"It's easy if you try\"), (0.054094253590455464, 'Above us, only sky'), (0.05074900272787694, 'Imagine no possessions')]\n"
+     ]
+    }
+   ],
+   "source": [
+    "# Step 4 - Sort the rank and pick top sentences\n",
+    "ranked_sentence = sorted(((scores[i],s) for i,s in enumerate(sentences)), reverse=True)    \n",
+    "print(\"Indexes of top ranked_sentence order are \\n\\n\", ranked_sentence)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "21ca9679-dc8f-401c-b410-d486d65027b7",
+   "metadata": {},
+   "source": [
+    "## Step 5 - How many sentences to pick"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 35,
+   "id": "410ab160-e71b-413a-a692-14bc2690ae3a",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdin",
+     "output_type": "stream",
+     "text": [
+      "How many sentences do you want in the summary?  3\n"
+     ]
+    }
+   ],
+   "source": [
+    "n = int(input(\"How many sentences do you want in the summary? \"))\n",
+    "#n=2\n",
+    "summarize_text = []\n",
+    "for i in range(n):\n",
+    "      summarize_text.append(\" \".join(ranked_sentence[i][1]))\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "01c45102-6c6a-4a36-8862-69952d890bcf",
+   "metadata": {},
+   "source": [
+    "## Step 6 : Finish off by printing summary"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 36,
+   "id": "57d6cf1e-7bff-4664-bd17-acf138f74034",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Summarize Text: \n",
+      " . I   h o p e   s o m e d a y   y o u ' l l   j o i n   u s   a n d   t h e   w o r l d   w i l l   b e   a s   o n e. I m a g i n e   a l l   t h e   p e o p l e   l i v i n '   f o r   t o d a y\n"
+     ]
+    }
+   ],
+   "source": [
+    "print(\"Summarize Text: \\n\", \". \".join(summarize_text))"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "b044e6ff-f928-4113-9ee1-234333936d60",
+   "metadata": {},
+   "source": [
+    "# text 5"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "bf68ead4-f3bd-41d9-bb53-38c54a2a86be",
+   "metadata": {},
+   "source": [
+    "## Step 1: Create the “vocabulary”"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 37,
+   "id": "dcc8e670-19e0-47f9-88c7-c0119647a4c4",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "In an attempt to build an AI-ready workforce, Microsoft announced Intelligent Cloud Hub which has been launched to empower the next generation of students with AI-ready skills\n",
+      "Envisioned as a three-year collaborative program, Intelligent Cloud Hub will support around 100 institutions with AI infrastructure, course content and curriculum, developer support, development tools and give students access to cloud and AI services\n",
+      "As part of the program, the Redmond giant which wants to expand its reach and is planning to build a strong developer ecosystem in India with the program will set up the core AI infrastructure and IoT Hub for the selected campuses\n",
+      "The company will provide AI development tools and Azure AI services such as Microsoft Cognitive Services, Bot Services and Azure Machine Learning.According to Manish Prakash, Country General Manager-PS, Health and Education, Microsoft India, said, \"With AI being the defining technology of our time, it is transIn an attempt to build an AI-ready workforce, Microsoft announced Intelligent Cloud Hub which has been launched to empower the next generation of students with AI-ready skills\n",
+      "Envisioned as a three-year collaborative program, Intelligent Cloud Hub will support around 100 institutions with AI infrastructure, course content and curriculum, developer support, development tools and give students access to cloud and AI services\n",
+      "As part of the program, the Redmond giant which wants to expand its reach and is planning to build a strong developer ecosystem in India with the program will set up the core AI infrastructure and IoT Hub for the selected campuses\n",
+      "The company will provide AI development tools and Azure AI services such as Microsoft Cognitive Services, Bot Services and Azure Machine Learning.According to Manish Prakash, Country General Manager-PS, Health and Education, Microsoft India, said, \"With AI being the defining technology of our time, it is transforming lives and industry and the jobs of tomorrow will require a different skillset\n",
+      "This will require more collaborations and training and working with AI\n",
+      "Thatâ€™s why it has become more critical than ever for educational institutions to integrate new cloud and AI technologies\n",
+      "The program is an attempt to ramp up the institutional set-up and build capabilities among the educators to educate the workforce of tomorrow.\" The program aims to build up the cognitive skills and in-depth understanding of developing intelligent cloud connected solutions for applications across industry\n",
+      "Earlier in April this year, the company announced Microsoft Professional Program In AI as a learning track open to the public\n",
+      "The program was developed to provide job ready skills to programmers who wanted to hone their skills in AI and data science with a series of online courses which featured hands-on labs and expert instructors as well\n",
+      "This program also included developer-focused AI school that provided a bunch of assets to help build AI skills.\n",
+      "Sentences are  [['In', 'an', 'attempt', 'to', 'build', 'an', 'AI-ready', 'workforce,', 'Microsoft', 'announced', 'Intelligent', 'Cloud', 'Hub', 'which', 'has', 'been', 'launched', 'to', 'empower', 'the', 'next', 'generation', 'of', 'students', 'with', 'AI-ready', 'skills'], ['Envisioned', 'as', 'a', 'three-year', 'collaborative', 'program,', 'Intelligent', 'Cloud', 'Hub', 'will', 'support', 'around', '100', 'institutions', 'with', 'AI', 'infrastructure,', 'course', 'content', 'and', 'curriculum,', 'developer', 'support,', 'development', 'tools', 'and', 'give', 'students', 'access', 'to', 'cloud', 'and', 'AI', 'services'], ['As', 'part', 'of', 'the', 'program,', 'the', 'Redmond', 'giant', 'which', 'wants', 'to', 'expand', 'its', 'reach', 'and', 'is', 'planning', 'to', 'build', 'a', 'strong', 'developer', 'ecosystem', 'in', 'India', 'with', 'the', 'program', 'will', 'set', 'up', 'the', 'core', 'AI', 'infrastructure', 'and', 'IoT', 'Hub', 'for', 'the', 'selected', 'campuses'], ['The', 'company', 'will', 'provide', 'AI', 'development', 'tools', 'and', 'Azure', 'AI', 'services', 'such', 'as', 'Microsoft', 'Cognitive', 'Services,', 'Bot', 'Services', 'and', 'Azure', 'Machine', 'Learning.According', 'to', 'Manish', 'Prakash,', 'Country', 'General', 'Manager-PS,', 'Health', 'and', 'Education,', 'Microsoft', 'India,', 'said,', '\"With', 'AI', 'being', 'the', 'defining', 'technology', 'of', 'our', 'time,', 'it', 'is', 'transIn', 'an', 'attempt', 'to', 'build', 'an', 'AI-ready', 'workforce,', 'Microsoft', 'announced', 'Intelligent', 'Cloud', 'Hub', 'which', 'has', 'been', 'launched', 'to', 'empower', 'the', 'next', 'generation', 'of', 'students', 'with', 'AI-ready', 'skills'], ['Envisioned', 'as', 'a', 'three-year', 'collaborative', 'program,', 'Intelligent', 'Cloud', 'Hub', 'will', 'support', 'around', '100', 'institutions', 'with', 'AI', 'infrastructure,', 'course', 'content', 'and', 'curriculum,', 'developer', 'support,', 'development', 'tools', 'and', 'give', 'students', 'access', 'to', 'cloud', 'and', 'AI', 'services'], ['As', 'part', 'of', 'the', 'program,', 'the', 'Redmond', 'giant', 'which', 'wants', 'to', 'expand', 'its', 'reach', 'and', 'is', 'planning', 'to', 'build', 'a', 'strong', 'developer', 'ecosystem', 'in', 'India', 'with', 'the', 'program', 'will', 'set', 'up', 'the', 'core', 'AI', 'infrastructure', 'and', 'IoT', 'Hub', 'for', 'the', 'selected', 'campuses'], ['The', 'company', 'will', 'provide', 'AI', 'development', 'tools', 'and', 'Azure', 'AI', 'services', 'such', 'as', 'Microsoft', 'Cognitive', 'Services,', 'Bot', 'Services', 'and', 'Azure', 'Machine', 'Learning.According', 'to', 'Manish', 'Prakash,', 'Country', 'General', 'Manager-PS,', 'Health', 'and', 'Education,', 'Microsoft', 'India,', 'said,', '\"With', 'AI', 'being', 'the', 'defining', 'technology', 'of', 'our', 'time,', 'it', 'is', 'transforming', 'lives', 'and', 'industry', 'and', 'the', 'jobs', 'of', 'tomorrow', 'will', 'require', 'a', 'different', 'skillset'], ['This', 'will', 'require', 'more', 'collaborations', 'and', 'training', 'and', 'working', 'with', 'AI'], ['Thatâ€™s', 'why', 'it', 'has', 'become', 'more', 'critical', 'than', 'ever', 'for', 'educational', 'institutions', 'to', 'integrate', 'new', 'cloud', 'and', 'AI', 'technologies'], ['The', 'program', 'is', 'an', 'attempt', 'to', 'ramp', 'up', 'the', 'institutional', 'set-up', 'and', 'build', 'capabilities', 'among', 'the', 'educators', 'to', 'educate', 'the', 'workforce', 'of', 'tomorrow.\"', 'The', 'program', 'aims', 'to', 'build', 'up', 'the', 'cognitive', 'skills', 'and', 'in-depth', 'understanding', 'of', 'developing', 'intelligent', 'cloud', 'connected', 'solutions', 'for', 'applications', 'across', 'industry'], ['Earlier', 'in', 'April', 'this', 'year,', 'the', 'company', 'announced', 'Microsoft', 'Professional', 'Program', 'In', 'AI', 'as', 'a', 'learning', 'track', 'open', 'to', 'the', 'public'], ['The', 'program', 'was', 'developed', 'to', 'provide', 'job', 'ready', 'skills', 'to', 'programmers', 'who', 'wanted', 'to', 'hone', 'their', 'skills', 'in', 'AI', 'and', 'data', 'science', 'with', 'a', 'series', 'of', 'online', 'courses', 'which', 'featured', 'hands-on', 'labs', 'and', 'expert', 'instructors', 'as', 'well'], ['This', 'program', 'also', 'included', 'developer-focused', 'AI', 'school', 'that', 'provided', 'a', 'bunch', 'of', 'assets', 'to', 'help', 'build', 'AI', 'skills.']]\n"
+     ]
+    }
+   ],
+   "source": [
+    "file = open(\"C:/Users/shakkerar/Desktop/Semester2_content/TBA/text_summary/Text5.txt\")\n",
+    "#This file contains one paragraph of multiple sentences\n",
+    "filedata = file.readlines()\n",
+    "article = filedata[0].split(\". \") #Just do the first paragraph\n",
+    "\n",
+    "sentences = []\n",
+    "for sentence in article:\n",
+    "    print(sentence)\n",
+    "    sentences.append(sentence.replace(\"[^a-zA-Z]\", \" \").split(\" \"))\n",
+    "print(\"Sentences are \", sentences)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "8b589895-a175-4f30-a4ff-b4cfc07f4f2a",
+   "metadata": {},
+   "source": [
+    "## Step 2: Term Frequency matrix"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "fc51f71a-90be-48b0-bd1b-a60f88ccd58b",
+   "metadata": {},
+   "source": [
+    "### Function to calculate similarity\u000b",
+    "(count the number of common words)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 38,
+   "id": "2654e30a-eba5-46a5-bdf3-4bb37036c0f9",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Similarity between sentence1 and sentence2: 0.20994555243259116\n"
+     ]
+    }
+   ],
+   "source": [
+    "import numpy as np\n",
+    "from scipy.spatial.distance import cosine\n",
+    "\n",
+    "def sentence_similarity(sent1, sent2):\n",
+    "    sent1 = [w.lower() for w in sent1]\n",
+    "    sent2 = [w.lower() for w in sent2]\n",
+    "    \n",
+    "    all_words = list(set(sent1 + sent2))\n",
+    "    vector1 = [0] * len(all_words)\n",
+    "    vector2 = [0] * len(all_words)\n",
+    "    \n",
+    "    # build the vector for the first sentence\n",
+    "    for w in sent1:\n",
+    "        vector1[all_words.index(w)] += 1\n",
+    "    \n",
+    "    # build the vector for the second sentence\n",
+    "    for w in sent2:\n",
+    "        vector2[all_words.index(w)] += 1\n",
+    "    \n",
+    "    # calculate cosine similarity\n",
+    "    similarity = 1 - cosine(vector1, vector2)\n",
+    "    \n",
+    "    return similarity if np.isfinite(similarity) else 0.0\n",
+    "\n",
+    "# Read sentences from a file\n",
+    "file_path = \"C:/Users/shakkerar/Desktop/Semester2_content/TBA/text_summary/Text5.txt\"\n",
+    "with open(file_path, \"r\") as file:\n",
+    "    filedata = file.readline()\n",
+    "    sentences = [sentence.strip() for sentence in filedata.split(\".\")]\n",
+    "\n",
+    "# Example usage\n",
+    "sentence1 = sentences[0].split()\n",
+    "sentence2 = sentences[1].split()\n",
+    "similarity_value = sentence_similarity(sentence1, sentence2)\n",
+    "\n",
+    "print(f\"Similarity between sentence1 and sentence2: {similarity_value}\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "3d5fa9cd-711d-4fb7-b48c-4562ad64bca9",
+   "metadata": {},
+   "source": [
+    "#### Create the similarity matrix"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 39,
+   "id": "7e990e3b-81cb-46b9-89f1-e9b645e4d33e",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Smilarity matrix \n",
+      " [[0.         0.96043785 0.97430838 0.94085032 0.9898649  0.96043785\n",
+      "  0.97430838 0.94085032 0.9702879  0.90982776 0.97850951 0.94960661\n",
+      "  0.95643336 0.94082489 0.96360734 0.91617813 1.        ]\n",
+      " [0.96043785 0.         0.95774313 0.96115844 0.95630015 1.\n",
+      "  0.95774313 0.96115844 0.95205844 0.88942706 0.95296465 0.94438493\n",
+      "  0.96703182 0.93699099 0.9562035  0.9378221  1.        ]\n",
+      " [0.97430838 0.95774313 0.         0.94809638 0.97674433 0.95774313\n",
+      "  1.         0.94809638 0.96961252 0.90019254 0.96506479 0.96636319\n",
+      "  0.94384537 0.9552765  0.97989391 0.93160191 1.        ]\n",
+      " [0.94085032 0.96115844 0.94809638 0.         0.94637339 0.96115844\n",
+      "  0.94809638 1.         0.94753933 0.88290146 0.94096046 0.90177202\n",
+      "  0.93511839 0.94431583 0.96119342 0.92887161 1.        ]\n",
+      " [0.9898649  0.95630015 0.97674433 0.94637339 0.         0.95630015\n",
+      "  0.97674433 0.94637339 0.99002746 0.93271085 0.97886786 0.94698597\n",
+      "  0.96025855 0.9592789  0.95939211 0.9132155  1.        ]\n",
+      " [0.96043785 1.         0.95774313 0.96115844 0.95630015 0.\n",
+      "  0.95774313 0.96115844 0.95205844 0.88942706 0.95296465 0.94438493\n",
+      "  0.96703182 0.93699099 0.9562035  0.9378221  1.        ]\n",
+      " [0.97430838 0.95774313 1.         0.94809638 0.97674433 0.95774313\n",
+      "  0.         0.94809638 0.96961252 0.90019254 0.96506479 0.96636319\n",
+      "  0.94384537 0.9552765  0.97989391 0.93160191 1.        ]\n",
+      " [0.94085032 0.96115844 0.94809638 1.         0.94637339 0.96115844\n",
+      "  0.94809638 0.         0.94753933 0.88290146 0.94096046 0.90177202\n",
+      "  0.93511839 0.94431583 0.96119342 0.92887161 1.        ]\n",
+      " [0.9702879  0.95205844 0.96961252 0.94753933 0.99002746 0.95205844\n",
+      "  0.96961252 0.94753933 0.         0.95041344 0.96239257 0.93373283\n",
+      "  0.95966065 0.9626468  0.96040771 0.91689475 1.        ]\n",
+      " [0.90982776 0.88942706 0.90019254 0.88290146 0.93271085 0.88942706\n",
+      "  0.90019254 0.88290146 0.95041344 0.         0.91299431 0.86871087\n",
+      "  0.9080411  0.93211081 0.90067926 0.84698739 1.        ]\n",
+      " [0.97850951 0.95296465 0.96506479 0.94096046 0.97886786 0.95296465\n",
+      "  0.96506479 0.94096046 0.96239257 0.91299431 0.         0.95916095\n",
+      "  0.94442124 0.9331326  0.94525304 0.90107461 1.        ]\n",
+      " [0.94960661 0.94438493 0.96636319 0.90177202 0.94698597 0.94438493\n",
+      "  0.96636319 0.90177202 0.93373283 0.86871087 0.95916095 0.\n",
+      "  0.91790308 0.92570217 0.93483154 0.90240038 1.        ]\n",
+      " [0.95643336 0.96703182 0.94384537 0.93511839 0.96025855 0.96703182\n",
+      "  0.94384537 0.93511839 0.95966065 0.9080411  0.94442124 0.91790308\n",
+      "  0.         0.92981403 0.9376717  0.93467574 1.        ]\n",
+      " [0.94082489 0.93699099 0.9552765  0.94431583 0.9592789  0.93699099\n",
+      "  0.9552765  0.94431583 0.9626468  0.93211081 0.9331326  0.92570217\n",
+      "  0.92981403 0.         0.94574382 0.89718239 1.        ]\n",
+      " [0.96360734 0.9562035  0.97989391 0.96119342 0.95939211 0.9562035\n",
+      "  0.97989391 0.96119342 0.96040771 0.90067926 0.94525304 0.93483154\n",
+      "  0.9376717  0.94574382 0.         0.95613251 1.        ]\n",
+      " [0.91617813 0.9378221  0.93160191 0.92887161 0.9132155  0.9378221\n",
+      "  0.93160191 0.92887161 0.91689475 0.84698739 0.90107461 0.90240038\n",
+      "  0.93467574 0.89718239 0.95613251 0.         1.        ]\n",
+      " [1.         1.         1.         1.         1.         1.\n",
+      "  1.         1.         1.         1.         1.         1.\n",
+      "  1.         1.         1.         1.         0.        ]]\n"
+     ]
+    }
+   ],
+   "source": [
+    "similarity_matrix = np.zeros((len(sentences), len(sentences)))\n",
+    " \n",
+    "for idx1 in range(len(sentences)):\n",
+    "        for idx2 in range(len(sentences)):\n",
+    "             if idx1 == idx2: #ignore if both are same sentences\n",
+    "                continue \n",
+    "             similarity_matrix[idx1][idx2] = sentence_similarity(sentences[idx1], sentences[idx2])\n",
+    "\n",
+    "print(\"Smilarity matrix \\n\", similarity_matrix)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "79ad3bc0-cd30-48eb-9272-5f7b8af1a671",
+   "metadata": {},
+   "source": [
+    "## Step3 : Rank sentences in similarity martix"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 40,
+   "id": "100346fc-d918-46d4-9a37-a58ff7251886",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "scores {0: 0.05918058850089555, 1: 0.059065097342434, 2: 0.05934062762643248, 3: 0.0585907391110176, 4: 0.05939026427477197, 5: 0.059065097342434, 6: 0.05934062762643248, 7: 0.0585907391110176, 8: 0.05924305415039287, 9: 0.05646616502476156, 10: 0.05887389980739459, 11: 0.05797891873492611, 12: 0.05856622738565683, 13: 0.05842963085719172, 14: 0.05908810498393262, 15: 0.05737344699269321, 16: 0.061416771127614914}\n"
+     ]
+    }
+   ],
+   "source": [
+    "# Step 3 - Rank sentences in similarity martix\n",
+    "from nltk.corpus import stopwords #you can remove stop words for speed\n",
+    "from nltk.cluster.util import cosine_distance\n",
+    "import numpy as np\n",
+    "import networkx as nx\n",
+    "sentence_similarity_graph = nx.from_numpy_array(similarity_matrix)\n",
+    "scores = nx.pagerank(sentence_similarity_graph)\n",
+    "print(\"scores\", scores)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "9fe9be1d-fee4-47d8-bc08-df6226ba7154",
+   "metadata": {},
+   "source": [
+    "## Step4: Sort sentences by pagerank"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 41,
+   "id": "d19414b5-c32c-41f5-8b86-f68da1e14e83",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Indexes of top ranked_sentence order are \n",
+      "\n",
+      " [(0.061416771127614914, ''), (0.05939026427477197, 'According to Manish Prakash, Country General Manager-PS, Health and Education, Microsoft India, said, \"With AI being the defining technology of our time, it is transIn an attempt to build an AI-ready workforce, Microsoft announced Intelligent Cloud Hub which has been launched to empower the next generation of students with AI-ready skills'), (0.05934062762643248, 'As part of the program, the Redmond giant which wants to expand its reach and is planning to build a strong developer ecosystem in India with the program will set up the core AI infrastructure and IoT Hub for the selected campuses'), (0.05934062762643248, 'As part of the program, the Redmond giant which wants to expand its reach and is planning to build a strong developer ecosystem in India with the program will set up the core AI infrastructure and IoT Hub for the selected campuses'), (0.05924305415039287, 'According to Manish Prakash, Country General Manager-PS, Health and Education, Microsoft India, said, \"With AI being the defining technology of our time, it is transforming lives and industry and the jobs of tomorrow will require a different skillset'), (0.05918058850089555, 'In an attempt to build an AI-ready workforce, Microsoft announced Intelligent Cloud Hub which has been launched to empower the next generation of students with AI-ready skills'), (0.05908810498393262, 'The program was developed to provide job ready skills to programmers who wanted to hone their skills in AI and data science with a series of online courses which featured hands-on labs and expert instructors as well'), (0.059065097342434, 'Envisioned as a three-year collaborative program, Intelligent Cloud Hub will support around 100 institutions with AI infrastructure, course content and curriculum, developer support, development tools and give students access to cloud and AI services'), (0.059065097342434, 'Envisioned as a three-year collaborative program, Intelligent Cloud Hub will support around 100 institutions with AI infrastructure, course content and curriculum, developer support, development tools and give students access to cloud and AI services'), (0.05887389980739459, 'Thatâ€™s why it has become more critical than ever for educational institutions to integrate new cloud and AI technologies'), (0.0585907391110176, 'The company will provide AI development tools and Azure AI services such as Microsoft Cognitive Services, Bot Services and Azure Machine Learning'), (0.0585907391110176, 'The company will provide AI development tools and Azure AI services such as Microsoft Cognitive Services, Bot Services and Azure Machine Learning'), (0.05856622738565683, '\" The program aims to build up the cognitive skills and in-depth understanding of developing intelligent cloud connected solutions for applications across industry'), (0.05842963085719172, 'Earlier in April this year, the company announced Microsoft Professional Program In AI as a learning track open to the public'), (0.05797891873492611, 'The program is an attempt to ramp up the institutional set-up and build capabilities among the educators to educate the workforce of tomorrow'), (0.05737344699269321, 'This program also included developer-focused AI school that provided a bunch of assets to help build AI skills'), (0.05646616502476156, 'This will require more collaborations and training and working with AI')]\n"
+     ]
+    }
+   ],
+   "source": [
+    "# Step 4 - Sort the rank and pick top sentences\n",
+    "ranked_sentence = sorted(((scores[i],s) for i,s in enumerate(sentences)), reverse=True)    \n",
+    "print(\"Indexes of top ranked_sentence order are \\n\\n\", ranked_sentence)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "1b360332-b5ce-42ec-818b-ce07f9e04c0f",
+   "metadata": {},
+   "source": [
+    "## Step 5 - How many sentences to pick"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 44,
+   "id": "a2093b93-44e5-4a95-a788-6c1dd9c4f7d1",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdin",
+     "output_type": "stream",
+     "text": [
+      "How many sentences do you want in the summary?  3\n"
+     ]
+    }
+   ],
+   "source": [
+    "n = int(input(\"How many sentences do you want in the summary? \"))\n",
+    "#n=2\n",
+    "summarize_text = []\n",
+    "for i in range(n):\n",
+    "      summarize_text.append(\" \".join(ranked_sentence[i][1]))\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "891d9a5b-7d7e-4bf7-895c-4a6667bdea83",
+   "metadata": {},
+   "source": [
+    "## Step 6 : Finish off by printing summary"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 45,
+   "id": "9ac94df0-a304-4482-8d34-2e0f07c9a7d1",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Summarize Text: \n",
+      " . A c c o r d i n g   t o   M a n i s h   P r a k a s h ,   C o u n t r y   G e n e r a l   M a n a g e r - P S ,   H e a l t h   a n d   E d u c a t i o n ,   M i c r o s o f t   I n d i a ,   s a i d ,   \" W i t h   A I   b e i n g   t h e   d e f i n i n g   t e c h n o l o g y   o f   o u r   t i m e ,   i t   i s   t r a n s I n   a n   a t t e m p t   t o   b u i l d   a n   A I - r e a d y   w o r k f o r c e ,   M i c r o s o f t   a n n o u n c e d   I n t e l l i g e n t   C l o u d   H u b   w h i c h   h a s   b e e n   l a u n c h e d   t o   e m p o w e r   t h e   n e x t   g e n e r a t i o n   o f   s t u d e n t s   w i t h   A I - r e a d y   s k i l l s. A s   p a r t   o f   t h e   p r o g r a m ,   t h e   R e d m o n d   g i a n t   w h i c h   w a n t s   t o   e x p a n d   i t s   r e a c h   a n d   i s   p l a n n i n g   t o   b u i l d   a   s t r o n g   d e v e l o p e r   e c o s y s t e m   i n   I n d i a   w i t h   t h e   p r o g r a m   w i l l   s e t   u p   t h e   c o r e   A I   i n f r a s t r u c t u r e   a n d   I o T   H u b   f o r   t h e   s e l e c t e d   c a m p u s e s\n"
+     ]
+    }
+   ],
+   "source": [
+    "print(\"Summarize Text: \\n\", \". \".join(summarize_text))"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3 (ipykernel)",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.12.1"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}
